@@ -31,7 +31,10 @@ long oldpaceActual;
 long paceDiff = 0;
 long oldPaceDiff;
 unsigned long timeStart = 0;
+unsigned long timeOfStateChange = 0;
 char* data;
+bool previousState = false;
+unsigned long triggerTime = 2000;
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -85,6 +88,7 @@ void connect() {
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
+      digitalRead(LED_BUILTIN)?digitalWrite(LED_BUILTIN,LOW):digitalWrite(LED_BUILTIN,HIGH);
       // Serial.println(" will try again in 0.5 seconds");
       // delay(500);
     }
@@ -171,21 +175,25 @@ String mqttSubscription()
   return("");
 }
 
-ICACHE_RAM_ATTR void countISR()
-{
-  detachInterrupt(D1);
-  delay(500);
-  paceActual++;
-  attachInterrupt(D1,countISR,RISING);
-}
+// ICACHE_RAM_ATTR void countISR()
+// {
+//   detachInterrupt(D1);
+//   if(timeSinceStateChange>triggerTime)
+//   {
+//     state = digitalRead(D1);
+//   }
+//   else
+//   paceActual++;
+//   attachInterrupt(D1,countISR,CHANGE);
+// }
 
-ICACHE_RAM_ATTR void reverseCountISR()
-{
-  detachInterrupt(D2);
-  delay(500);
-  paceActual--;
-  attachInterrupt(D2,reverseCountISR,RISING);
-}
+// ICACHE_RAM_ATTR void reverseCountISR()
+// {
+//   detachInterrupt(D2);
+//   delay(500);
+//   paceActual--;
+//   attachInterrupt(D2,reverseCountISR,RISING);
+// }
 
 void updateData()
 {
@@ -230,9 +238,26 @@ void displayData()
   // }
 }
 
-void parseData()
+ICACHE_RAM_ATTR void countChangeISR()
 {
-  
+  timeOfStateChange = millis();
+}
+
+void pollInput()
+{
+  if(previousState!=digitalRead(D1))
+  {
+    if(millis()-timeOfStateChange>triggerTime)
+    {
+      if((previousState==LOW)&&(digitalRead(D1)))
+      {
+        paceActual++;
+        Serial.print(paceActual);
+      }
+      previousState=digitalRead(D1);
+    }
+    
+  }
 }
 
 void setup()
@@ -241,11 +266,11 @@ void setup()
   setupWiFi();
   initDisplay();
   setupMQTT();
-  parseData();
   pinMode(D1,INPUT);
   pinMode(D2,INPUT);
-  attachInterrupt(digitalPinToInterrupt(D2), reverseCountISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(D1), countISR, RISING);
+  pinMode(LED_BUILTIN,OUTPUT);
+  // attachInterrupt(digitalPinToInterrupt(D2), reverseCountISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(D1), countChangeISR, CHANGE);
   timeStart = millis();
 }
 
@@ -257,4 +282,6 @@ void loop()
   mqttClient.loop();
   updateData();
   displayData();
+  pollInput();
+  
 }
