@@ -187,13 +187,18 @@ String mqttSubscription()
 //   attachInterrupt(D1,countISR,CHANGE);
 // }
 
-// ICACHE_RAM_ATTR void reverseCountISR()
-// {
-//   detachInterrupt(D2);
-//   delay(500);
-//   paceActual--;
-//   attachInterrupt(D2,reverseCountISR,RISING);
-// }
+ICACHE_RAM_ATTR void reverseCountISR()
+{
+  detachInterrupt(D2);
+  delay(2000);
+  if(!digitalRead(D2))
+  {
+    paceActual--;
+    Serial.print("Pace Actual: ");
+    Serial.println(paceActual);
+  }
+  attachInterrupt(D2,reverseCountISR,FALLING);
+}
 
 void updateData()
 {
@@ -269,7 +274,7 @@ void setup()
   pinMode(D1,INPUT);
   pinMode(D2,INPUT);
   pinMode(LED_BUILTIN,OUTPUT);
-  // attachInterrupt(digitalPinToInterrupt(D2), reverseCountISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(D2), reverseCountISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(D1), countChangeISR, CHANGE);
   timeStart = millis();
 }
